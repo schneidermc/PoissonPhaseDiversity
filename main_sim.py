@@ -22,6 +22,20 @@ from src.sim_cell import cell_multi, cell_multi_3D
 from skimage.transform import downscale_local_mean as dlm
 
 
+def set_working_directory(levels_up=1):
+    import os
+    dir = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(levels_up):
+        dir = os.path.dirname(dir)
+    os.chdir(dir)
+    print(f"Working directory set to: {dir}")
+
+
+# Set working directory one higher
+set_working_directory(levels_up=1)
+
+
+
 #precompute pupil and zernike polynomials
 pixelSize = .096
 NA = 1.2
