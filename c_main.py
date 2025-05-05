@@ -22,14 +22,14 @@ from cuda.c_functions_py import CuFunc
 #precompute pupil and zernike polynomials
 pixelSize = .096
 NA = 1.2
-l = .532
+l = .532 # wavelength
 pupilSize = NA/l
 Sk0 = np.pi*(pixelSize*pupilSize)**2
 l2p = 2*np.pi/l #length to phase
 dsize = 256
 dim = (dsize, dsize)
 num_imgs = 3
-num_phi = 12
+num_phi = 12 # number of Zernike modes
 rotang = 0
 
 zern, R, Theta, inds = get_zern(dsize, pupilSize, pixelSize, num_phi)
@@ -72,6 +72,7 @@ phi /= np.linalg.norm(phi)
 phi *= 4
 
 
+# Create simulated object
 ob = cell_multi(dsize*2, 1000, (30, 60), e = .1, overlap = .5)
 hob = ob[dsize//2:-dsize//2, dsize//2:-dsize//2]
 hob = np.ascontiguousarray(hob)
@@ -89,18 +90,48 @@ theta = defocus(np.array([-div_mag, div_mag, 0]), R, inds, NA, l, RI)
 d_theta = cf.load_array(np.complex64(theta))
 d_F = cf.load_array(np.complex64(F))
 
+
+# Create simulated images
 imgs0 = sim_im_2(ob, dim, phi, num_imgs, theta, zern, R, inds)
 snr, imgs0 = add_noise(imgs0, num_photons = 500, dark_noise = 1, read_noise = 2)
 imgs0 = scl_imgs(imgs0)
 
+# Display image size
+print(f'Image size: {imgs0.shape}')
+
+# Plot images
+plt.figure()
+for i in range(num_imgs):
+    plt.subplot(1, num_imgs, i+1)
+    plt.imshow(imgs0[i], cmap = 'gray')
+    plt.axis('off')
+plt.show()
+
+# Create initial object estimate
 f = np.ones((dsize, dsize))
 
 num_updates = 1
 num_c = 12
 zern = zern[:num_c]
+# Initialize coefficient estimate
 c0 = np.zeros((num_c))+1e-10
 # c0 = np.random.rand(num_c)
+
+# Run Poisson reconstruction algorithm
 c2, cost2, num_iter2, sss = iter_p(zern[:num_c], inds, imgs0, theta, Sk0, c0.copy(), ff, show)
+
+# Extract estimated object (f)
+object_est = sss[1]
+
+# Display estimated object
+plt.figure()
+plt.imshow(object_est, cmap = 'gray')
+plt.axis('off')
+plt.show()
+
+
+### CUDA implementation
+print('Run CUDA implementation...')
 
 d_c = cf.load_array(np.float32(c0))
 dU = normalize(np.arange(num_c))*np.pi/Sk0
@@ -117,7 +148,7 @@ d_dc = cf.c_init_array(num_c, 0)
 d_imgs = cf.load_array(np.float32(imgs0))
 d_G = cf.cu_init_array(h3d, 1)
 
-
+# Run CUDA Poisson iteration
 cf.cu_ipc(num_imgs, dsize, num_c, num_inds, num_updates, d_F, d_theta, d_c, d_zern, d_wavefront, 
           d_H, d_h, d_s, d_S, d_G, d_g, r2c, c2r, c2c, r2cs, c2rs, handle, d_inds, h_g, d_dU, d_dF, d_Q, d_f, d_df,
           d_q, d_inner, d_inner1, d_dL_integrand, d_dc, d_imgs, np.float32(num_imgs*Sk0))
