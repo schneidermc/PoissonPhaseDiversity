@@ -1,0 +1,15 @@
+name: cuda-pd
+channels:
+  # - conda-forge
+  - defaults
+dependencies:
+  - python
+  - cudatoolkit
+  - matplotlib
+  - numba
+  - numpy
+  - pillow
+  - pyfftw
+  - scikit-image
+  - scipy
+  # - streamlit
